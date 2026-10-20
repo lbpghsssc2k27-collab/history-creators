@@ -1,0 +1,17 @@
+name: Keep Supabase awake
+
+on:
+  schedule:
+    - cron: '0 6 * * 1,4'   # every Monday and Thursday
+  workflow_dispatch:         # lets you run it by hand from the Actions tab
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ask Supabase for one album row
+        run: |
+          curl --fail --silent --show-error \
+            "https://ipiuezemcumnviodicua.supabase.co/rest/v1/albums?select=id&limit=1" \
+            -H "apikey: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlwaXVlemVtY3VtbnZpb2RpY3VhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTEzNDY3NTksImV4cCI6MjEwNjkyMjc1OX0.-ViwkMyQpBsqDri9zgO7QO0jHEXUP8-jIdQKbDS5VvM" \
+            -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlwaXVlemVtY3VtbnZpb2RpY3VhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTEzNDY3NTksImV4cCI6MjEwNjkyMjc1OX0.-ViwkMyQpBsqDri9zgO7QO0jHEXUP8-jIdQKbDS5VvM"
