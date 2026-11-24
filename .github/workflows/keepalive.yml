@@ -4,6 +4,9 @@ on:
     - cron: '17 9 * * *'   # daily at 09:17 UTC
   workflow_dispatch:        # lets you test manually from the Actions tab
 
+permissions:
+  issues: write
+  contents: read
 jobs:
   ping:
     runs-on: ubuntu-latest
