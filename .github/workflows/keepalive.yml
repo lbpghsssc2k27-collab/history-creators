@@ -1,17 +1,58 @@
-name: Keep Supabase awake
-
+name: Keep Supabase Alive
 on:
   schedule:
-    - cron: '0 6 * * 1,4'   # every Monday and Thursday
-  workflow_dispatch:         # lets you run it by hand from the Actions tab
+    - cron: '17 9 * * *'   # daily at 09:17 UTC
+  workflow_dispatch:        # lets you test manually from the Actions tab
 
 jobs:
   ping:
     runs-on: ubuntu-latest
     steps:
-      - name: Ask Supabase for one album row
+      - name: Query keepalive table (3x)
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
         run: |
-          curl --fail --silent --show-error \
-            "https://ipiuezemcumnviodicua.supabase.co/rest/v1/albums?select=id&limit=1" \
-            -H "apikey: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlwaXVlemVtY3VtbnZpb2RpY3VhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTEzNDY3NTksImV4cCI6MjEwNjkyMjc1OX0.-ViwkMyQpBsqDri9zgO7QO0jHEXUP8-jIdQKbDS5VvM" \
-            -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlwaXVlemVtY3VtbnZpb2RpY3VhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTEzNDY3NTksImV4cCI6MjEwNjkyMjc1OX0.-ViwkMyQpBsqDri9zgO7QO0jHEXUP8-jIdQKbDS5VvM"
+          set -euo pipefail
+          for i in 1 2 3; do
+            status=$(curl -sS -o /dev/null -w "%{http_code}" \
+              --retry 5 --retry-all-errors --retry-delay 15 \
+              "$SUPABASE_URL/rest/v1/keepalive?select=id,pinged_at&limit=1" \
+              -H "apikey: $SUPABASE_ANON_KEY" \
+              -H "Authorization: Bearer $SUPABASE_ANON_KEY")
+            echo "Ping $i: HTTP $status"
+            if [ "$status" != "200" ]; then
+              exit 1
+            fi
+            sleep 2
+          done
+
+      - name: Open an issue if the ping failed
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const title = '🚨 Supabase keepalive failed';
+            const body = `The daily keepalive workflow failed. Possible causes:\n\n- **DNS error / timeout**: The project may already be paused. Resume it from the Supabase dashboard, then re-run the workflow.\n- **401 / 403**: The anon key may have been rotated. Update the \`SUPABASE_ANON_KEY\` repo secret.`;
+            const { data: issues } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              labels: 'supabase-keepalive',
+              state: 'open'
+            });
+            if (issues.length > 0) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issues[0].number,
+                body: `Another failure on ${new Date().toISOString()}`
+              });
+            } else {
+              await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title: title,
+                body: body,
+                labels: ['supabase-keepalive']
+              });
+            }
